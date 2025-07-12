@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Muz Dünyası 🍌</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      font-family: 'Press Start 2P', monospace;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+      background: #1d1d1d;
+      image-rendering: pixelated;
+    }
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      color: #fff;
+      font-size: 14px;
+      width: 100%;
+      height: 100%;
+      font-family: 'Press Start 2P', cursive;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      pointer-events: none;
+      text-align: center;
+    }
+    #replayBtn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 12px;
+      border: none;
+      background: #fff;
+      color: #000;
+      font-family: 'Press Start 2P', monospace;
+      cursor: pointer;
+      pointer-events: all;
+    }
+    @font-face {
+      font-family: 'Press Start 2P';
+      src: url('https://fonts.gstatic.com/s/pressstart2p/v11/e3t4euO8T-267oIAQAu6jDQyK6lsZc8.woff2') format('woff2');
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <div id="overlay" style="display: none;">
+    <div id="endingText">İYİ SON</div>
+    <button id="replayBtn">TEKRAR OYNA</button>
+  </div>
+
+  <!-- Osuruk sesi -->
+  <audio id="fartSound" src="https://www.soundjay.com/human/fart-01.mp3" preload="auto"></audio>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    const endingText = document.getElementById('endingText');
+    const replayBtn = document.getElementById('replayBtn');
+    const fartSound = document.getElementById('fartSound');
+
+    const character = {
+      x: 170,
+      y: 300,
+      width: 60,
+      height: 60,
+      color: 'yellow',
+    };
+
+    let state = 'intro'; // intro, good, bad
+    let fartPlayed = false;
+
+    const bananas = [];
+
+    function drawCharacter() {
+      ctx.fillStyle = character.color;
+      ctx.fillRect(character.x, character.y, character.width, character.height);
+      ctx.fillStyle = 'brown';
+      ctx.fillRect(character.x + 20, character.y + 40, 20, 10); // muz
+    }
+
+    function drawText(txt, y, size = 14, color = 'white') {
+      ctx.fillStyle = color;
+      ctx.font = `${size}px 'Press Start 2P'`;
+      ctx.fillText(txt, 20, y);
+    }
+
+    function drawBananas() {
+      for (let banana of bananas) {
+        ctx.fillStyle = 'yellow';
+        ctx.fillRect(banana.x, banana.y, 10, 20);
+        banana.y += 2;
+      }
+    }
+
+    function drawScene() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (state === 'intro') {
+        // Gökyüzü
+        ctx.fillStyle = '#87CEEB';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Çimen zemin
+        ctx.fillStyle = '#228B22';
+        ctx.fillRect(0, character.y + character.height, canvas.width, canvas.height - (character.y + character.height));
+
+        // Güneş
+        ctx.fillStyle = 'yellow';
+        ctx.fillRect(320, 30, 40, 40);
+
+        drawCharacter();
+        drawText("Muz yiyor...", 100);
+
+        setTimeout(() => {
+          if (!fartPlayed) {
+            drawText("💨 Pırt!", 130);
+            fartSound.play();
+            fartPlayed = true;
+          }
+        }, 1000);
+      }
+
+      if (state === 'bad') {
+        ctx.fillStyle = '#000022';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        drawBananas();
+      }
+
+      if (state === 'good') {
+        ctx.fillStyle = '#000011';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      if (state === 'intro') {
+        if (
+          clickX >= character.x &&
+          clickX <= character.x + character.width &&
+          clickY >= character.y &&
+          clickY <= character.y + character.height
+        ) {
+          // Adam tıklandı → İyi son
+          state = 'good';
+          setTimeout(() => showEnding('İYİ SON'), 1000);
+        } else {
+          // Yere tıklandı → Kötü sonindex.html
+
+          state = 'bad';
+          for (let i = 0; i < 50; i++) {
+            bananas.push({ x: Math.random() * canvas.width, y: Math.random() * -600 });
+          }
+          setTimeout(() => showEnding('KÖTÜ SON'), 2000);
+        }
+      }
+    });
+
+    function showEnding(text) {
+      overlay.style.display = 'flex';
+      endingText.innerText = text;
+    }
+
+    replayBtn.addEventListener('click', () => {
+      overlay.style.display = 'none';
+      state = 'intro';
+      fartPlayed = false;
+      bananas.length = 0;
+    });
+
+    function gameLoop() {
+      drawScene();
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+  </script>
+</body>
+</html>
