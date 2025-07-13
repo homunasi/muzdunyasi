@@ -1,304 +1,213 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Muz Dünyası 🍌</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-  body {
-    margin: 0;
-    background: #000;
-    font-family: 'Press Start 2P', monospace;
-    overflow: hidden;
-    touch-action: manipulation;
-    user-select: none;
-  }
-  canvas {
-    display: block;
-    margin: auto;
-    background: #87CEEB; /* gökyüzü */
-    image-rendering: pixelated;
-  }
-  #overlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
-    background: rgba(0,0,0,0.8);
-    color: white;
-    font-family: 'Press Start 2P', cursive;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    font-size: 20px;
-    visibility: hidden;
-  }
-  #overlay.show {
-    visibility: visible;
-  }
-  #replayBtn {
-    margin-top: 30px;
-    padding: 12px 24px;
-    font-size: 14px;
-    cursor: pointer;
-    background: #fff;
-    color: #000;
-    border: none;
-    font-family: 'Press Start 2P', monospace;
-    border-radius: 4px;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=400, initial-scale=1.0" />
+  <title>Muz Dünyası 🍌</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      font-family: 'Press Start 2P', monospace;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+      background: #1d1d1d;
+      image-rendering: pixelated;
+    }
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      color: #fff;
+      font-size: 14px;
+      width: 100%;
+      height: 100%;
+      font-family: 'Press Start 2P', cursive;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      pointer-events: none;
+      text-align: center;
+    }
+    #replayBtn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 12px;
+      border: none;
+      background: #fff;
+      color: #000;
+      font-family: 'Press Start 2P', monospace;
+      cursor: pointer;
+      pointer-events: all;
+    }
+    @font-face {
+      font-family: 'Press Start 2P';
+      src: url('https://fonts.gstatic.com/s/pressstart2p/v11/e3t4euO8T-267oIAQAu6jDQyK6lsZc8.woff2') format('woff2');
+    }
+  </style>
 </head>
 <body>
-<canvas id="game" width="400" height="600"></canvas>
+  <canvas id="gameCanvas" width="400" height="400"></canvas>
+  <div id="overlay" style="display: none;">
+    <div id="endingText">SON</div>
+    <button id="replayBtn">TEKRAR OYNA</button>
+  </div>
 
-<div id="overlay">
-  <div id="endText">İYİ SON</div>
-  <button id="replayBtn">TEKRAR OYNA</button>
-</div>
+  <!-- Sesler -->
+  <audio id="fartSound" src="https://www.soundjay.com/human/fart-01.mp3" preload="auto"></audio>
+  <audio id="eat1" src="https://cdn.pixabay.com/audio/2021/08/09/audio_0e6568c2e1.mp3" preload="auto"></audio>
+  <audio id="eat2" src="https://cdn.pixabay.com/audio/2022/03/15/audio_1fdab5a4d5.mp3" preload="auto"></audio>
+  <audio id="eat3" src="https://cdn.pixabay.com/audio/2023/02/06/audio_79d109cf6d.mp3" preload="auto"></audio>
 
-<!-- Sesler -->
-<audio id="eatSound1" src="https://minecraft.fandom.com/wiki/Sounds/Entity_Player_Burp?file=entity.player.burp.ogg" preload="auto"></audio>
-<audio id="eatSound2" src="https://actions.google.com/sounds/v1/food/chewing.ogg" preload="auto"></audio>
-<audio id="fartSound" src="https://www.soundjay.com/human/fart-01.mp3" preload="auto"></audio>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const overlay = document.getElementById("overlay");
+    const endingText = document.getElementById("endingText");
+    const replayBtn = document.getElementById("replayBtn");
+    const fartSound = document.getElementById("fartSound");
 
-<script>
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const overlay = document.getElementById('overlay');
-const endText = document.getElementById('endText');
-const replayBtn = document.getElementById('replayBtn');
+    const eatSounds = [
+      document.getElementById("eat1"),
+      document.getElementById("eat2"),
+      document.getElementById("eat3"),
+    ];
 
-const eatSounds = [
-  document.getElementById('eatSound1'),
-  document.getElementById('eatSound2')
-];
-const fartSound = document.getElementById('fartSound');
+    const character = {
+      x: 170,
+      y: 250,
+      width: 60,
+      height: 60,
+    };
 
-const WIDTH = canvas.width;
-const HEIGHT = canvas.height;
+    let state = "intro"; // intro, good, bad
+    let fartPlayed = false;
+    let tick = 0;
+    const bananas = [];
 
-// Oyun durumları
-// "intro": adam muz yiyor ve osuruyor (otomatik)
-// "goodEnd": adam tıklandı → iyi son ekranı
-// "badEnd": yere tıklandı → kötü son ekranı
-let state = "intro";
+    function drawCharacter() {
+      ctx.fillStyle = "#ffcc00"; // baş
+      ctx.fillRect(character.x + 20, character.y, 20, 20);
 
-// Zamanlama için
-let eatStarted = false;
-let eatEnded = false;
-let fartPlayed = false;
-let eatSoundTimer = 0;
-let fartTimer = 0;
+      ctx.fillStyle = "yellow"; // muz
+      ctx.fillRect(character.x + 25, character.y + 20, 10, 10);
 
-// Muz yağmuru
-let bananas = [];
+      ctx.fillStyle = "black"; // kıyafet
+      ctx.fillRect(character.x, character.y + 30, 60, 20);
 
-// Adamın basit piksel karakteri (erkek, sarı saç, kahverengi pantolon, siyah üst)
-const character = {
-  x: 170,
-  y: 350,
-  width: 60,
-  height: 80
-};
+      ctx.fillStyle = "#8B4513"; // pantolon
+      ctx.fillRect(character.x, character.y + 50, 60, 10);
 
-// Dünya ve muzdan dünya (iyi son, kötü son arka planları)
-const earthImg = new Image();
-earthImg.src = "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/220px-The_Earth_seen_from_Apollo_17.jpg";
+      if (state === "intro" && tick === 60 && !fartPlayed) {
+        const randomEat = eatSounds[Math.floor(Math.random() * eatSounds.length)];
+        randomEat.play();
+      }
 
-const bananaWorldImg = new Image();
-bananaWorldImg.src = "https://i.imgur.com/9ytfXTi.png"; // Muzdan dünya benzeri bir görsel (örnek)
+      if (state === "intro" && tick === 120 && !fartPlayed) {
+        fartSound.play();
+        // Pırt görseli
+        ctx.fillStyle = "lightgray";
+        ctx.beginPath();
+        ctx.arc(character.x + 30, character.y + 65, 10, 0, Math.PI * 2);
+        ctx.fill();
+        fartPlayed = true;
+      }
+    }
 
-function randomChoice(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
+    function drawBackground() {
+      if (state === "intro") {
+        ctx.fillStyle = "#87CEEB";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-function drawPixelRect(x,y,w,h,color){
-  ctx.fillStyle = color;
-  ctx.fillRect(x,y,w,h);
-}
+        // Çimen
+        ctx.fillStyle = "#228B22";
+        ctx.fillRect(0, 320, canvas.width, 80);
 
-function drawCharacter(){
-  // saç (sarı)
-  drawPixelRect(character.x + 20, character.y, 20, 15, "#FFD700");
-  // kafa (açık ten)
-  drawPixelRect(character.x + 20, character.y + 15, 20, 20, "#FBE1C4");
-  // gövde (siyah üst)
-  drawPixelRect(character.x + 10, character.y + 35, 40, 40, "#000000");
-  // pantolon (kahverengi)
-  drawPixelRect(character.x + 10, character.y + 75, 40, 25, "#654321");
-  // ayakkabı (siyah)
-  drawPixelRect(character.x + 10, character.y + 100, 40, 10, "#000000");
-  // muz (kahverengi sap + sarı gövde)
-  drawPixelRect(character.x + 40, character.y + 50, 10, 6, "#8B4513");
-  drawPixelRect(character.x + 40, character.y + 56, 10, 15, "#FFFF00");
-}
+        // Güneş
+        ctx.fillStyle = "yellow";
+        ctx.beginPath();
+        ctx.arc(350, 50, 20, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (state === "good") {
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-function drawFart(x, y, frame) {
-  // Basit pırt görseli - beyaz küçük bulut şeklinde
-  const alpha = 1 - frame/30;
-  ctx.globalAlpha = alpha > 0 ? alpha : 0;
-  ctx.fillStyle = "#fff";
-  ctx.beginPath();
-  ctx.ellipse(x + 10 + frame*2, y + 65 - frame*0.5, 10, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-}
+        // Dünya resmi gibi arka plan
+        ctx.fillStyle = "#3B9CFF";
+        ctx.beginPath();
+        ctx.arc(200, 200, 150, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#3CB043";
+        ctx.fillRect(180, 180, 40, 30);
+      } else if (state === "bad") {
+        ctx.fillStyle = "#111";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        drawBananaRain();
+      }
+    }
 
-function drawBananas() {
-  for(let i=0; i < bananas.length; i++){
-    let b = bananas[i];
-    ctx.fillStyle = "#FFFF00";
-    ctx.fillRect(b.x, b.y, 15, 30);
-    ctx.fillStyle = "#8B4513";
-    ctx.fillRect(b.x+4, b.y, 7, 8);
-    b.y += b.speed;
-    if(b.y > HEIGHT) bananas.splice(i, 1);
-  }
-}
+    function drawBananaRain() {
+      for (let banana of bananas) {
+        ctx.fillStyle = "yellow";
+        ctx.fillRect(banana.x, banana.y, 10, 20);
+        banana.y += 3;
+      }
+    }
 
-function spawnBananas(count=50){
-  for(let i=0; i < count; i++){
-    bananas.push({
-      x: Math.random() * WIDTH,
-      y: Math.random() * -600,
-      speed: 2 + Math.random() * 2
+    function gameLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawBackground();
+      if (state === "intro") drawCharacter();
+      tick++;
+      requestAnimationFrame(gameLoop);
+    }
+
+    canvas.addEventListener("click", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      if (state === "intro") {
+        if (
+          clickX >= character.x &&
+          clickX <= character.x + character.width &&
+          clickY >= character.y &&
+          clickY <= character.y + character.height
+        ) {
+          state = "good";
+          setTimeout(() => showEnding("İYİ SON"), 1000);
+        } else {
+          state = "bad";
+          for (let i = 0; i < 50; i++) {
+            bananas.push({
+              x: Math.random() * canvas.width,
+              y: Math.random() * -500,
+            });
+          }
+          setTimeout(() => showEnding("KÖTÜ SON"), 1500);
+        }
+      }
     });
-  }
-}
 
-function drawIntroScene(){
-  // Gökyüzü
-  ctx.fillStyle = "#87CEEB";
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  // Güneş (piksel karelerden)
-  for(let i=0; i < 7; i++){
-    for(let j=0; j < 7; j++){
-      ctx.fillStyle = "yellow";
-      ctx.fillRect(320 + i*6, 30 + j*6, 6, 6);
+    function showEnding(text) {
+      overlay.style.display = "flex";
+      endingText.innerText = text;
     }
-  }
 
-  // Çimen (piksel yeşili bloklar)
-  for(let i=0; i < WIDTH; i += 8){
-    ctx.fillStyle = "#228B22";
-    ctx.fillRect(i, character.y + character.height, 8, HEIGHT - (character.y + character.height));
-  }
+    replayBtn.addEventListener("click", () => {
+      overlay.style.display = "none";
+      state = "intro";
+      fartPlayed = false;
+      bananas.length = 0;
+      tick = 0;
+    });
 
-  drawCharacter();
-
-  if(!eatStarted){
-    eatStarted = true;
-    eatSoundTimer = 0;
-  }
-
-  if(eatSoundTimer < 120){ // 2 saniye boyunca aralıklı yeme sesi
-    if(eatSoundTimer % 30 === 0){
-      randomChoice(eatSounds).play();
-    }
-    eatSoundTimer++;
-  } else if (!eatEnded) {
-    eatEnded = true;
-    fartSound.play();
-    fartTimer = 0;
-  }
-
-  // Fart animasyonu
-  if(eatEnded && fartTimer < 30){
-    drawFart(character.x, character.y, fartTimer);
-    fartTimer++;
-  }
-}
-
-function drawGoodEnd(){
-  // Uzaydan dünya (daha büyük, ortalanmış)
-  ctx.fillStyle = "#000011";
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  if(earthImg.complete){
-    ctx.drawImage(earthImg, WIDTH/2 - 110, HEIGHT/2 - 110, 220, 220);
-  } else {
-    ctx.fillStyle = "white";
-    ctx.fillText("Dünya Yükleniyor...", WIDTH/2 - 70, HEIGHT/2);
-  }
-
-  ctx.fillStyle = "white";
-  ctx.font = "24px 'Press Start 2P'";
-  ctx.textAlign = "center";
-  ctx.fillText("İYİ SON", WIDTH/2, HEIGHT/2 + 140);
-}
-
-function drawBadEnd(){
-  // Muzdan dünya arka planı (koyu gece)
-  ctx.fillStyle = "#220000";
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  if(bananaWorldImg.complete){
-    ctx.drawImage(bananaWorldImg, WIDTH/2 - 110, HEIGHT/2 - 110, 220, 220);
-  } else {
-    ctx.fillStyle = "white";
-    ctx.fillText("Yükleniyor...", WIDTH/2 - 70, HEIGHT/2);
-  }
-
-  // Muz yağmuru
-  drawBananas();
-
-  ctx.fillStyle = "white";
-  ctx.font = "24px 'Press Start 2P'";
-  ctx.textAlign = "center";
-  ctx.fillText("KÖTÜ SON", WIDTH/2, HEIGHT/2 + 140);
-}
-
-// Oyun döngüsü
-function gameLoop(){
-  if(state === "intro"){
-    drawIntroScene();
-  } else if(state === "goodEnd"){
-    drawGoodEnd();
-  } else if(state === "badEnd"){
-    drawBadEnd();
-  }
-  requestAnimationFrame(gameLoop);
-}
-
-canvas.addEventListener("click", (e) => {
-  if(state !== "intro") return;
-
-  const rect = canvas.getBoundingClientRect();
-  const cx = e.clientX - rect.left;
-  const cy = e.clientY - rect.top;
-
-  if(cx >= character.x && cx <= character.x + character.width &&
-     cy >= character.y && cy <= character.y + character.height){
-    // Adam tıklandı → İyi son
-    state = "goodEnd";
-    overlay.classList.add("show");
-    endText.textContent = "İYİ SON";
-  } else {
-    // Yere tıklandı → Kötü son
-    state = "badEnd";
-    spawnBananas(80);
-    overlay.classList.add("show");
-    endText.textContent = "KÖTÜ SON";
-  }
-});
-
-replayBtn.addEventListener("click", () => {
-  // Oyunu sıfırla
-  bananas = [];
-  eatStarted = false;
-  eatEnded = false;
-  fartPlayed = false;
-  eatSoundTimer = 0;
-  fartTimer = 0;
-  state = "intro";
-  overlay.classList.remove("show");
-});
-
-gameLoop();
-</script>
+    gameLoop();
+  </script>
 </body>
 </html>
